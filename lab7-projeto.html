@@ -1,0 +1,275 @@
+<!--
+	THIS EXAMPLE WAS DOWNLOADED FROM https://echarts.apache.org/examples/en/editor.html?c=line-smooth
+-->
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="height: 100%; margin: 0">
+  <select style="border: 2px solid #110; border-radius: 5px;" id="sel" required>
+    <option value="EXP" selected>Exportações</option>
+    <option value="IMP">Importações</option>
+    <option value="BAL">Balanço Comercial</option>
+  </select>
+  <div id="container" style="height: 100%"></div>
+
+  <script type="text/javascript" src="https://echarts.apache.org/en/js/vendors/jquery@3.7.1/dist/jquery.min.js"></script>
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  
+  <!-- Uncomment this line if you want to dataTool extension
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5/dist/extension/dataTool.min.js"></script>
+  -->
+  <!-- Uncomment this line if you want to use gl extension
+  <script type="text/javascript" src="https://echarts.apache.org/en/js/vendors/echarts-gl/dist/echarts-gl.min.js"></script>
+  -->
+  <!-- Uncomment this line if you want to echarts-stat extension
+  <script type="text/javascript" src="https://echarts.apache.org/en/js/vendors/echarts-stat/dist/ecStat.min.js"></script>
+  -->
+  <!-- Uncomment this line if you want to echarts-graph-modularity extension
+  <script type="text/javascript" src="https://echarts.apache.org/en/js/vendors/echarts-graph-modularity/dist/echarts-graph-modularity.min.js"></script>
+  -->
+  <!-- Uncomment this line if you want to use map
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@4.9.0/map/js/world.js"></script>
+  -->
+  <!-- Uncomment these two lines if you want to use bmap extension
+  <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=YOUR_API_KEY"></script>
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5/dist/extension/bmap.min.js"></script>
+  -->
+
+  <script type="text/javascript">
+    function getMapData(data, type, year) {
+      const result = []
+      data[type][year].forEach(country => {
+        result.push({ name: country.name, value: country.us_value })
+      })
+      return result
+    }
+
+    function getMinMax(mapData) {
+      return {
+        min: Math.min(...mapData.map(obj => obj.value)),
+        max: Math.max(...mapData.map(obj => obj.value))
+      }
+    }
+
+    function getBalYearsAmount(data) {
+      const years = Object.keys(data.BAL)
+      const amounts = []
+      years.forEach(year => {
+        amounts.push(data.BAL[year].reduce((sum, item) => sum + item.us_value, 0))
+      })
+      return [years, amounts]
+    }
+
+    function getExpYearsAmount(data) {
+      const years = Object.keys(data.EXP)
+      const amounts = []
+      years.forEach(year => {
+        amounts.push(data.EXP[year].reduce((sum, item) => sum + item.us_value, 0))
+      })
+      return [years, amounts]
+    }
+
+    function getImpYearsAmount(data) {
+      const years = Object.keys(data.IMP)
+      const amounts = []
+      years.forEach(year => {
+        amounts.push(data.IMP[year].reduce((sum, item) => sum + item.us_value, 0))
+      })
+      return [years, amounts]
+    }
+
+    async function loadData(selValue) {
+      let currentYear = 2025;
+
+      const data = await fetch("dataset.json").then(response => response.json())
+      const balYearsAmount = getBalYearsAmount(data)
+      const expYearsAmount = getExpYearsAmount(data)
+      const impYearsAmount = getImpYearsAmount(data)
+      const mapData = getMapData(data, selValue, currentYear)
+      const { min: minCountry, max: maxCountry } = getMinMax(mapData)
+
+      var dom = document.getElementById('container');
+      var myChart = echarts.init(dom, null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+      });
+      var app = {};
+      var ROOT_PATH = 'https://echarts.apache.org/examples';
+      var option;
+      var titleField;
+      var inRangeColors;
+
+      switch (selValue) {
+        case 'BAL':
+          titleField = 'na balança comercial'
+          inRangeColors = ['#961718', '#FFFFFF', '#12311C']
+        case 'EXP':
+          titleField = 'de exportações'
+          inRangeColors = ['#FFFFFF', '#12311C']
+        case 'IMP':
+          titleField = 'de importações'
+          inRangeColors = ['#FFFFFF', '#961718']
+      }
+
+      option = {
+        title: {
+          text: `Volume ${titleField} do Brasil (Ano ${currentYear})`,
+          subtext: 'Dados do Monitor do Comércio Exterior Brasileiro',
+          left: 'center'
+        },
+        tooltip: {
+          trigger: 'item',
+          showDelay: 0,
+          transitionDuration: 0.2,
+          formatter: function (params) {
+            if (params.seriesType === 'map') {
+              if (params.value != null) {
+                return params.name + '<br/><b>US$ ' + (params.value / 1e9).toFixed(1) + ' bi</b>';
+              }
+              return params.name + '<br/>(sem dados)';
+            } else if (params.seriesType === 'line') {
+              return '<b>Ano ' + 
+                params.name + 
+                '</b><br/> US$ ' + 
+                (params.value / 1e9).toFixed(1) + 
+                ' bi';
+            }
+            return params.name;
+          },
+          valueFormatter: function (value) {
+            return 'US$ ' + (value / 1e9).toFixed(1) + ' bi';
+          },
+          axisPointer: {
+            type: 'shadow'
+          }
+        },
+        legend: {
+          data: ['Exportações', 'Importações', 'Balança Comercial'],
+          bottom: 220
+        },
+        xAxis: {
+          type: 'category',
+          data: balYearsAmount[0],
+          name: 'Série Histórica',
+          nameLocation: 'middle',
+          nameGap: 40,
+          nameTextStyle: {
+            fontSize: 14,
+            fontWeight: 'bold'
+          }
+        },
+        dataZoom: [
+          {
+            type: 'slider',
+            xAxisIndex: 0,
+            start: 0,
+            end: 100,
+            handleSize: '100%',
+          }
+        ],
+        yAxis: {
+          name: 'Bilhões de US$',
+          type: 'value',
+          axisLabel: {
+            formatter: value => {
+              return (value / 1e9).toFixed(0)
+            }
+          }
+        },
+        visualMap: {
+          min: minCountry,
+          max: maxCountry,
+          realtime: true,
+          calculable: true,
+          left: 'right',
+          bottom: '30%',
+          seriesIndex: 0,
+          inRange: { color: inRangeColors },
+          formatter: value => (value/1e9).toFixed(0)
+        },
+        geo: {
+          map: 'world',
+          roam: true,
+          top: '8%',
+          height: '50%',
+          width: '55%',
+          emphasis: { label: { show: true } },
+          zlevel: 0
+        },
+        grid: {
+          left: '5%',
+          right: '5%',
+          bottom: '5%',
+          top: '64%',
+          height: '20%',
+          zlevel: 1,
+          backgroundColor: '#FFFFFF'
+        },
+        series: [
+          {
+            type: 'map',
+            geoIndex: 0,
+            roam: true,
+            map: 'world',
+            emphasis: {
+              show: true,
+              label: {
+                show: true,
+                fontWeight: 'bold',
+                color: '#000'
+              }
+            },
+            data: mapData
+          },
+          {
+            name: 'Balança Comercial',
+            data: balYearsAmount[1],
+            type: 'line',
+            smooth: true,
+            lineStyle: {
+              type: 'dashed'
+            },
+            emphasis: {
+              focus: 'series'
+            },
+          },
+          {
+            name: 'Exportações',
+            data: expYearsAmount[1],
+            type: 'line',
+            smooth: true,
+            emphasis: {
+              focus: 'series'
+            },
+          },
+          {
+            name: 'Importações',
+            data: impYearsAmount[1],
+            type: 'line',
+            smooth: true,
+            emphasis: {
+              focus: 'series'
+            },
+          }
+        ]
+      };
+
+      $.get('world.json', function (geoJSON) {
+        echarts.registerMap('world', geoJSON);
+        myChart.setOption(option)
+      });
+      
+      window.addEventListener('resize', myChart.resize);
+    }
+    const sel = document.getElementById('sel');
+
+    sel.addEventListener('change', () => {
+      loadData(sel.value);
+    })
+
+    loadData(sel.value)
+  </script>
+</body>
+</html>
